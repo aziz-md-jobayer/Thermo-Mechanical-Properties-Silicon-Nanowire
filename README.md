@@ -1,6 +1,6 @@
 # Thermo-Mechanical-Properties-Silicon-Nanowire
 
-This repository encompasses input files developed for assessing the Thermal and Mechanical properties of Silicon nanowire. The nanowire nanostructure is given below,
+This repository encompasses input files I developed for assessing the Thermal (NEMD) and Mechanical properties (Uniaxial Tensile Loading) of Silicon nanowire. The nanowire nanostructure is given below,
 .
 ![Nanowire Structure](https://github.com/aziz-md-jobayer/Thermo-Mechanical-Properties-Silicon-Nanowire/assets/146165236/9ac24e57-0c31-4879-bf69-5a562cb68d4f)
 Figure 1: (a) Orthogonal View (b) Cross Section and (c) Side View of a Silicon Nanowire.

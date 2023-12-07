@@ -1,0 +1,61 @@
+read_restart X.restart.1
+reset_timestep 0
+
+pair_style              meam
+pair_coeff             * * ffields/MEAM/library.meam Fe Mn Si C ffields/MEAM/CFeMnSi.meam Si
+
+# Variables for thermal conductivity
+variable               dt          equal     0.0005         # INPUT
+variable               Tdamp       equal     v_dt*100
+variable               scalex      equal     5.4687325644225   # Lattice parameter
+variable               scaley      equal     5.4687325644225   # Lattice parameter
+variable               scalez      equal     5.4687325644225   # Lattice parameter
+
+variable               l           equal     142              # INPUT, Transport length (units)
+variable               m           equal     2              # INPUT, cross-section y (units)
+variable               n           equal     2              # INPUT, cruss-section z (units)
+
+# MD Parameters       
+variable               Tm            equal   300            # INPUT, Temperature
+variable               dT            equal   30                # INPUT, Temperature Delta (Th-Tbody=Tbody-Tc)
+variable               nstep         equal   1000000           # INPUT, Total MD steps
+variable               nstep_restart equal   ${nstep}/20
+variable               outstep       equal   1000
+
+variable               Th            equal       ${Tm}+${dT}
+variable               Tc            equal       ${Tm}-${dT}
+
+thermo                 ${outstep} 
+timestep               ${dt}
+                      
+variable               length        equal ${scalex}*${l}
+variable               width         equal ${scaley}*${m}
+variable               height        equal ${scalez}*${n}
+                      
+compute                th grth temp
+compute                tc grtc temp
+compute                tm grtm temp
+compute                myKE all ke/atom
+compute                myPE all pe/atom
+compute                myStress all stress/atom NULL virial
+compute                flux grtm heat/flux myKE myPE myStress
+variable               heat_x equal c_flux[1]/${length}/$m/$n
+variable               heat_y equal c_flux[2]/${width}/$n/$l
+variable               heat_z equal c_flux[3]/${height}/$l/$m
+
+# Thermal conductivity calculation, NVT (Thot)- NVE (transport) - NVT (Tcold)
+fix                    fixth   grth nvt temp ${Th} ${Th} ${Tdamp} 
+fix                    fixtc   grtc nvt temp ${Tc} ${Tc} ${Tdamp} 
+fix                    fixtm   grtm nve
+
+variable               encum   equal (f_fixtc-f_fixth)/2.
+variable               endel   equal (-f_fixtc-f_fixth)/2.
+
+thermo_style           custom  step c_th c_tm c_tc f_fixth f_fixtc v_encum v_endel v_heat_x v_heat_y v_heat_z
+
+#dump                   dmp_them all custom 1000 md_rescaling.traj id element xu yu zu vx vy vz
+#dump_modify            dmp_them sort id
+
+restart                ${nstep_restart} restart.dat
+run                    ${nstep}
+write_restart          X.restart.2

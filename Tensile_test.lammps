@@ -1,0 +1,76 @@
+# MatSQ - MD : Tensile test calculation to get Stress-Strain curve
+# # Written by M. Park (Virtual Lab)
+# # 2020. 05. 29.
+
+# Define system
+units 		metal
+dimension	3
+boundary	p p p
+atom_style	atomic
+
+# Read data and define FF
+variable        dt    equal 0.0005
+variable        Tdamp equal v_dt*100
+variable        Pdamp equal v_dt*1000
+variable        Temp  equal 300
+
+
+pair_style              tersoff
+read_data      Si.lammps
+pair_coeff             * * ffields/TERSOFF/Si_B.tersoff Si	
+
+# Equilibration
+reset_timestep	0
+timestep        ${dt}
+velocity        all create ${Temp} 12345 mom yes rot no
+fix             1 all npt temp ${Temp} ${Temp} ${Tdamp} iso 0 0 ${Pdamp} drag 1 
+thermo          1000
+thermo_style    custom step lx ly lz press pxx pyy pzz pe temp
+run             20000 # Run for at least 10 picosecond (assuming 1 fs timestep)
+unfix           1
+
+# Deformation simualtion begin
+reset_timestep	0
+#variable        srate  equal 1.0e10             # strain rate : 1.e10 s-1
+#variable        srate1 equal "v_srate / 1.0e12" # convert, ps -> s
+
+## X-direction
+variable        tmp equal "lx"   # x-direction
+variable        L0 equal ${tmp}
+fix		1 all npt temp ${Temp} ${Temp} ${Tdamp} y 0 0 ${Pdamp} z 0 0 ${Pdamp} drag 1
+fix		fdeform all deform 1 x erate 0.001 units box remap x  # erate [s-1]
+#fix             fdeform all deform 1 x vel 0.002 units box remap x         # velocity [A/ps]
+variable        strain equal "(lx - v_L0)/v_L0"
+
+## Y-direction
+#variable        tmp equal "ly"   # y-direction
+#variable        L0 equal ${tmp}
+#fix		1 all npt temp ${Temp} ${Temp} ${Tdamp} x 0 0 ${Pdamp} z 0 0 ${Pdamp} drag 1
+#fix		fdeform all deform 1 y erate 0.002 units box remap x  # erate [s-1]
+##fix            fdeform all deform 1 y vel 0.002 units box remap x        # velocity [A/ps]
+#variable        strain equal "(ly - v_L0)/v_L0"
+
+## Z-direction
+#variable        tmp equal "lz"   # z-direction
+#variable        L0 equal ${tmp}
+#fix		1 all npt temp ${Temp} ${Temp} ${Tdamp} x 0 0 ${Pdamp} y 0 0 ${Pdamp} drag 1
+#fix		fdeform all deform 1 z erate 0.002 units box remap x  # erate [s-1]
+##fix            fdeform all deform 1 z vel 0.002 units box remap x        # velocity [A/ps]
+#variable        strain equal "(lz - v_L0)/v_L0"
+
+# p2, p3, p4 [GPa]
+variable        p1 equal "v_strain"
+variable        p2 equal "-pxx/10000"
+variable        p3 equal "-pyy/10000"
+variable        p4 equal "-pzz/10000"
+fix             def1 all print 100 "${p1} ${p2} ${p3} ${p4}" file ss_calculation.txt screen no
+
+# Dump trajectories
+#dump            dmp_ss all custom 1000 *.dat id type xu yu zu vx vy vz element
+dump            dmp_ss all custom 1000 *.dat id type xs ys zs vx vy vz element
+dump_modify     dmp_ss element Si
+thermo 	        1000 
+thermo_style	custom step v_strain temp v_p2 v_p3 v_p4 ke pe press
+
+run		1000000
+
